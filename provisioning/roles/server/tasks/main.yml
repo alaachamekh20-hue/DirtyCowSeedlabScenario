@@ -1,0 +1,52 @@
+---
+- name: Adding DNS aliases to /etc/hosts on server machine
+  loop: "{{ aliases | dict2items }}"
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ item.value }} {{ item.key }}"
+
+- name: Install Python 3 and basic networking utilities on server
+  apt:
+    name:
+      - python3
+      - curl
+      - net-tools
+    state: present
+    update_cache: yes
+
+- name: Create flag server directory
+  file:
+    path: /opt/dirtycow_flag_server
+    state: directory
+    mode: '0755'
+
+- name: Deploy dynamic flag verification server script
+  template:
+    src: flag_server.py
+    dest: /opt/dirtycow_flag_server/flag_server.py
+    mode: '0755'
+
+- name: Create systemd unit for dirtycow-flag-server
+  copy:
+    dest: /etc/systemd/system/dirtycow-flag-server.service
+    content: |
+      [Unit]
+      Description=Dirty COW Flag Distribution and Verification Service
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=root
+      WorkingDirectory=/opt/dirtycow_flag_server
+      ExecStart=/usr/bin/python3 /opt/dirtycow_flag_server/flag_server.py
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Reload systemd daemon and start dirtycow-flag-server
+  systemd:
+    name: dirtycow-flag-server
+    daemon_reload: yes
+    state: started
+    enabled: yes

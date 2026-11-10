@@ -1,0 +1,188 @@
+{
+  "title": "System Security: Dirty COW Race Condition Attack Lab",
+  "description": "A hands-on cyber range training lab based on the SEED Labs Dirty COW vulnerability (CVE-2016-5195). Students analyze Copy-On-Write (COW) memory management, race conditions between write and madvise, modify read-only files, and escalate privileges to root.",
+  "prerequisites": [
+    "Basic knowledge of C programming and POSIX threads (pthread)",
+    "Familiarity with Linux memory mapping (mmap) and /proc filesystem",
+    "Understanding of Linux user management and /etc/passwd"
+  ],
+  "outcomes": [
+    "Understand the fundamental mechanics of Copy-On-Write (COW) and memory mapping.",
+    "Understand race condition vulnerabilities inside operating system kernels.",
+    "Exploit the Dirty COW vulnerability using /proc/self/mem and madvise(MADV_DONTNEED).",
+    "Modify an arbitrary read-only file owned by root without root permissions.",
+    "Achieve local root privilege escalation by modifying /etc/passwd to assign UID 0."
+  ],
+  "state": "UNRELEASED",
+  "show_stepper_bar": true,
+  "estimated_duration": 60,
+  "variant_sandboxes": false,
+  "levels": [
+    {
+      "title": "Introduction",
+      "level_type": "INFO_LEVEL",
+      "order": 0,
+      "estimated_duration": 5,
+      "minimal_possible_solve_time": null,
+      "content": "# Dirty COW Attack Lab - Introduction\n\n## Disclaimer\nThis training lab is designed for **educational purposes only** inside an isolated cyber range sandbox.\n\n## Vulnerability Overview (CVE-2016-5195)\nThe **Dirty COW** vulnerability is a critical race condition bug present in the Linux kernel from September 2007 (version 2.6.22) until it was discovered and patched in October 2016.\n\nThe flaw resides in the Copy-On-Write (COW) memory subsystem of the kernel. By exploiting a race condition between writing to private memory mappings via `/proc/self/mem` and calling `madvise()` with `MADV_DONTNEED`, an unprivileged local user can write directly to read-only files owned by `root`.\n\n## Lab Environment & Network Topology\n- **seed** (`10.1.30.10`): Your primary student workstation where you compile and execute the exploit.\n- **server** (`10.1.30.5`): Verification and flag distribution server.\n- **router** (`10.1.30.1`): Default gateway connecting the sandbox network.\n\n### Pre-configured Accounts on `seed`:\n- Default User: `user` / `Password123` (or `seed` / `dees`)\n- Victim Target Account: `charlie` / `seedcharlie` (UID `1001`)\n- Root User: `root` (UID `0`)\n\n### Scoring Structure (20 Points Total):\n- **Task 1: Memory Mapping and Copy-On-Write** - `3 points`\n- **Task 2: Modifying Dummy Read-Only File** - `7 points`\n- **Task 3: Analyzing /etc/passwd and Root UID** - `3 points`\n- **Task 4: Privilege Escalation via /etc/passwd** - `7 points`"
+    },
+    {
+      "title": "Access the Sandbox",
+      "level_type": "ACCESS_LEVEL",
+      "order": 1,
+      "estimated_duration": 5,
+      "minimal_possible_solve_time": null,
+      "passkey": "start",
+      "cloud_content": "## Connecting to Your Sandbox\n\n1. In the topology visualization, right-click the **seed** node and select **Open GUI** (or SSH into `10.1.30.10`).\n2. Log in with:\n   - Username: **user**\n   - Password: **Password123**\n3. Open a terminal and check your kernel version:\n   ```bash\n   uname -r\n   ```\n4. Verify that the lab directory `/home/user/Labsetup` is present:\n   ```bash\n   ls -la /home/user/Labsetup\n   ```\n5. Submit **start** to proceed to the first task.",
+      "local_content": "Local sandbox access."
+    },
+    {
+      "title": "Task 1: Memory Mapping and Copy-On-Write",
+      "level_type": "TRAINING_LEVEL",
+      "order": 2,
+      "estimated_duration": 10,
+      "minimal_possible_solve_time": null,
+      "answer": "MAP_PRIVATE",
+      "answer_variable_name": null,
+      "max_score": 3,
+      "content": "# Task 1: Memory Mapping and Copy-On-Write\n\nBefore executing the attack, you must understand how memory mapping with Copy-On-Write works in Unix-like operating systems.\n\nWhen a program maps a file into its virtual address space using `mmap()`:\n```c\nmap = mmap(NULL, file_size, PROT_READ, flags, f, 0);\n```\nTo ensure that modifications made by the process remain private to its memory and do **not** write back to the underlying disk file, a specific mapping flag must be passed.\n\nUnder normal kernel behavior, writing to this mapped memory triggers Copy-On-Write (COW): the kernel allocates a new, private physical page for the process so the original file remains unmodified.\n\n### Question:\nWhat mapping flag constant (e.g., `MAP_SHARED` or `MAP_PRIVATE`) instructs `mmap()` to create a copy-on-write private mapping where updates are not written through to the underlying file?\n\nEnter the exact flag name in **UPPERCASE** as your answer.",
+      "solution": "The flag constant is MAP_PRIVATE. When using MAP_PRIVATE, modifications to the mapped area are private to the process and use Copy-On-Write, leaving the underlying file untouched under normal conditions.",
+      "solution_penalized": false,
+      "hints": [
+        {
+          "title": "mmap Manual Page",
+          "content": "Check man 2 mmap. Look for the flags argument that creates a private copy-on-write mapping.",
+          "hint_penalty": 0.5,
+          "order": 0
+        },
+        {
+          "title": "Flag Name",
+          "content": "The opposite of MAP_SHARED is MAP_PRIVATE.",
+          "hint_penalty": 1.0,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Task 2: Modifying Dummy Read-Only File",
+      "level_type": "TRAINING_LEVEL",
+      "order": 3,
+      "estimated_duration": 15,
+      "minimal_possible_solve_time": null,
+      "answer": "FLAG{DIRTYCOW_DUMMY_WRITE_SUCCESS}",
+      "answer_variable_name": null,
+      "max_score": 7,
+      "content": "# Task 2: Modifying Dummy Read-Only File\n\nThe target file `/zzz` has been created by `root` with permissions `-rw-r--r--` (`0644`). Normal users can read it, but cannot write to it:\n```bash\n$ ls -l /zzz\n-rw-r--r-- 1 root root 19 ... /zzz\n$ cat /zzz\n111111222222333333\n$ echo 999999 > /zzz\nbash: /zzz: Permission denied\n```\n\nYour objective is to exploit the Dirty COW race condition to overwrite the string `222222` inside `/zzz` with `******`.\n\n### Steps to execute:\n1. Change into the lab setup directory:\n   ```bash\n   cd /home/user/Labsetup\n   ```\n2. Inspect the starter exploit `cow_attack.c`. Note how two threads race against each other:\n   - `writeThread`: repeatedly seeks to the target offset in `/proc/self/mem` and writes `******`.\n   - `madviseThread`: repeatedly calls `madvise(map, file_size, MADV_DONTNEED)` to advise the kernel to discard the private copy.\n3. Compile and run the exploit:\n   ```bash\n   gcc cow_attack.c -lpthread -o cow_attack\n   ./cow_attack\n   ```\n4. Let it run for 2-5 seconds, then stop it with `Ctrl+C`.\n5. Verify that `/zzz` has been modified:\n   ```bash\n   cat /zzz\n   # Expected output: 111111******333333\n   ```\n6. Once `/zzz` has been successfully modified, retrieve your flag by querying the verification service:\n   ```bash\n   curl http://10.1.30.5:8080/cow_flag/task1\n   ```",
+      "solution": "Compile cow_attack.c with gcc cow_attack.c -lpthread -o cow_attack. Run ./cow_attack for a few seconds. Check cat /zzz to verify 111111******333333. Then run curl http://10.1.30.5:8080/cow_flag/task1 to fetch the flag.",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "Compiling with pthreads",
+          "content": "Remember to link the POSIX threads library using the -lpthread flag: gcc cow_attack.c -lpthread -o cow_attack",
+          "hint_penalty": 1.0,
+          "order": 0
+        },
+        {
+          "title": "Stopping the infinite loop",
+          "content": "The exploit runs an infinite loop in both threads to win the race condition. Wait about 3 to 5 seconds and press Ctrl+C to terminate the process.",
+          "hint_penalty": 1.5,
+          "order": 1
+        },
+        {
+          "title": "Flag Verification Endpoint",
+          "content": "Make sure cat /zzz shows 111111******333333, then run: curl http://10.1.30.5:8080/cow_flag/task1",
+          "hint_penalty": 2.0,
+          "order": 2
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Task 3: Analyzing /etc/passwd and Root UID",
+      "level_type": "TRAINING_LEVEL",
+      "order": 4,
+      "estimated_duration": 10,
+      "minimal_possible_solve_time": null,
+      "answer": "0",
+      "answer_variable_name": null,
+      "max_score": 3,
+      "content": "# Task 3: Analyzing /etc/passwd and Root UID\n\nIn Linux, user account definitions are maintained in `/etc/passwd`. Each line consists of seven colon-delimited fields:\n```\nusername:password:UID:GID:gecos:home_directory:shell\n```\n\nInspect the accounts on your system:\n```bash\ncat /etc/passwd | grep -E '^(root|charlie):'\n```\nYou will see:\n```\nroot:x:0:0:root:/root:/bin/bash\ncharlie:x:1001:1001:Charlie Brown,,,:/home/charlie:/bin/bash\n```\n\nThe 3rd field represents the numeric **User Identifier (UID)**. In Linux, access control is governed strictly by UID rather than username.\n\n### Question:\nWhat numeric User ID (UID) represents the superuser (`root`) that gives an account unrestricted system privileges?\n\nSubmit the numeric value as your answer.",
+      "solution": "In Linux and Unix operating systems, UID 0 represents the root superuser.",
+      "solution_penalized": false,
+      "hints": [
+        {
+          "title": "Root Record in /etc/passwd",
+          "content": "Look at the third field of root:x:0:0:root:/root:/bin/bash.",
+          "hint_penalty": 0.5,
+          "order": 0
+        },
+        {
+          "title": "Numeric UID",
+          "content": "The UID for root is a single digit: 0.",
+          "hint_penalty": 1.0,
+          "order": 1
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    },
+    {
+      "title": "Task 4: Privilege Escalation via /etc/passwd",
+      "level_type": "TRAINING_LEVEL",
+      "order": 5,
+      "estimated_duration": 20,
+      "minimal_possible_solve_time": null,
+      "answer": "FLAG{DIRTYCOW_ROOT_PRIV_ESC_PWNED}",
+      "answer_variable_name": null,
+      "max_score": 7,
+      "content": "# Task 4: Privilege Escalation via /etc/passwd\n\nNow you will perform full local privilege escalation using Dirty COW on `/etc/passwd`.\n\nYour target is the user account `charlie`:\n```\ncharlie:x:1001:1001:Charlie Brown,,,:/home/charlie:/bin/bash\n```\n\nBy overwriting `charlie`'s UID from `1001` to `0000`, the system will treat `charlie` as a root superuser whenever `charlie` logs in!\n\n### Instructions:\n1. In `/home/user/Labsetup/`, inspect `cow_attack_passwd.c` (or adapt `cow_attack.c`):\n   - Target file: `/etc/passwd`\n   - Target search string: `charlie:x:1001`\n   - Replacement string: `charlie:x:0000` (equal length to avoid corrupting file boundaries)\n2. Compile the exploit:\n   ```bash\n   gcc cow_attack_passwd.c -lpthread -o cow_attack_passwd\n   ```\n3. Run `./cow_attack_passwd` for a few seconds, then press `Ctrl+C`.\n4. Check `/etc/passwd` to verify the entry was modified:\n   ```bash\n   grep charlie /etc/passwd\n   # Expected: charlie:x:0000:1001:Charlie Brown,,,:/home/charlie:/bin/bash\n   ```\n5. Switch user to `charlie` (password: `seedcharlie`):\n   ```bash\n   su charlie\n   ```\n6. Verify that you have obtained a root shell:\n   ```bash\n   id\n   # Output: uid=0(root) gid=1001(charlie) groups=1001(charlie)...\n   whoami\n   # Output: root\n   ```\n7. While holding the root shell, fetch the final flag:\n   ```bash\n   curl http://10.1.30.5:8080/cow_flag/task2\n   ```",
+      "solution": "Modify cow_attack.c to open /etc/passwd, search for 'charlie:x:1001', and overwrite with 'charlie:x:0000'. Run for 3-5 seconds. Verify grep charlie /etc/passwd shows 0000. Run su charlie with password 'seedcharlie'. Run id to confirm uid=0(root). Execute curl http://10.1.30.5:8080/cow_flag/task2 to retrieve the flag.",
+      "solution_penalized": true,
+      "hints": [
+        {
+          "title": "String length preservation",
+          "content": "Ensure your replacement string has the exact same byte length as the target pattern (e.g., replacing '1001' with '0000') so other records in /etc/passwd are not shifted or corrupted.",
+          "hint_penalty": 1.0,
+          "order": 0
+        },
+        {
+          "title": "Switching to charlie",
+          "content": "Switch user with 'su charlie'. When prompted for a password, enter 'seedcharlie'. Your prompt should display '#'.",
+          "hint_penalty": 1.5,
+          "order": 1
+        },
+        {
+          "title": "Final Flag Endpoint",
+          "content": "Once uid=0(root) is verified with id, execute: curl http://10.1.30.5:8080/cow_flag/task2",
+          "hint_penalty": 2.0,
+          "order": 2
+        }
+      ],
+      "incorrect_answer_limit": 10,
+      "attachments": [],
+      "variant_answers": false,
+      "reference_solution": [],
+      "mitre_techniques": [],
+      "expected_commands": [],
+      "commands_required": false
+    }
+  ]
+}

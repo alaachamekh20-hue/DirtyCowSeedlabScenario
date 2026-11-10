@@ -1,0 +1,72 @@
+---
+- name: Adding DNS aliases to /etc/hosts on seed machine
+  loop: "{{ aliases | dict2items }}"
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ item.value }} {{ item.key }}"
+
+- name: Install C compiler, pthreads, make, and development tools
+  apt:
+    name:
+      - build-essential
+      - gcc
+      - make
+      - gdb
+      - curl
+      - wget
+      - nano
+      - vim
+      - python3
+    state: present
+    update_cache: yes
+
+- name: Create the read-only dummy file /zzz owned by root
+  copy:
+    dest: /zzz
+    content: "111111222222333333\n"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Ensure charlie user exists with UID 1001
+  user:
+    name: charlie
+    uid: 1001
+    shell: /bin/bash
+    comment: "Charlie Brown"
+    password: "$6$rounds=656000$salt123$vRjL/QO4w0nCegmQ4ZpY49vXw9wB8Y1E1JgZc5kO8K8gR7kQ8N4iQ7ZlE8wM2pL9cK4wB6jG9mP4wK8yL2kO1." # seedcharlie
+    create_home: yes
+    state: present
+
+- name: Create a backup of /etc/passwd for safety
+  copy:
+    src: /etc/passwd
+    dest: /etc/passwd.seedbak
+    remote_src: yes
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Copy Labsetup directory to user home
+  copy:
+    src: Labsetup/
+    dest: /home/user/Labsetup/
+    owner: user
+    group: user
+    mode: '0755'
+
+- name: Ensure flag_check.sh has executable permissions
+  file:
+    path: /home/user/Labsetup/flag_check.sh
+    mode: '0755'
+    owner: user
+    group: user
+
+- name: Add helper aliases in bashrc
+  blockinfile:
+    path: /home/user/.bashrc
+    block: |
+      # Dirty COW lab aliases
+      alias checklab='/home/user/Labsetup/flag_check.sh'
+      alias resetzzz='echo "111111222222333333" | sudo tee /zzz > /dev/null'
+      alias resetpasswd='sudo cp /etc/passwd.seedbak /etc/passwd'

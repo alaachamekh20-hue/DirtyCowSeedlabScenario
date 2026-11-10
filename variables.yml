@@ -1,0 +1,6 @@
+---
+# CyberRangeCZ Automatic Problem Generation (APG) Variables
+# When variant_sandboxes: true is set in training.json, these generate unique flags per student sandbox
+
+flag_task1: "FLAG{COW_DUMMY_{{ 99999999 | random(10000000) }}}"
+flag_task2: "FLAG{COW_ROOT_{{ 99999999 | random(10000000) }}}"
