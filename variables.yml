@@ -4,9 +4,9 @@
 
 
 flag_task1:
-  - type: password
+    type: password
     length: 16
 
 flag_task2:
-  - type: password
+    type: password
     length: 16
