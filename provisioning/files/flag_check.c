@@ -60,7 +60,7 @@ int main(void)
         printf("[flag_check] Task not completed yet.\n");
         printf("             /zzz currently contains: \"%s\"\n", zzz_content);
         printf("             Expected:                 \"%s\"\n", EXPECTED_STR);
-        printf("\nHint: Run ./cow_attack in /home/user/Labsetup/, wait a few seconds, then try again.\n");
+        printf("\nHint: Run ./cow_attack in /home/seed/Labsetup/, wait a few seconds, then try again.\n");
         return 2;
     }
 

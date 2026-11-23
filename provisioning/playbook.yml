@@ -6,6 +6,8 @@
 - name: Configure seed machine
   hosts: seed
   become: true
+  vars:
+    lab_root: /home/seed/Labsetup
 
   tasks:
 
@@ -22,20 +24,21 @@
         update_cache: yes
 
     # ── 2. Strip blanket sudo from seed account ────────────────────────────────
-    - name: Disable broad sudoers entries for seed
-      shell: |
-        for f in /etc/sudoers.d/*; do
-          if grep -qE '^\s*(seed)\s+ALL\s*=\s*\(ALL\)' "$f" 2>/dev/null; then
-            mv "$f" "${f}.disabled"
-          fi
-        done
-      args:
-        executable: /bin/bash
+    - name: Find sudoers.d files granting seed unrestricted sudo
+      shell: >
+        grep -rlE '^\s*(seed|%seed)\s+ALL\s*=\s*\(ALL(:ALL)?\)\s*NOPASSWD:\s*ALL' /etc/sudoers.d/ || true
+      register: blanket_sudo_files
+      changed_when: false
+
+    - name: Disable each blanket sudo file found
+      command: mv "{{ item }}" "{{ item }}.disabled"
+      loop: "{{ blanket_sudo_files.stdout_lines }}"
+      when: blanket_sudo_files.stdout_lines | length > 0
 
     # ── 3. Scoped sudo helper: only allow make_setuid_root ────────────────────
     - name: Install make_setuid_root helper
       copy:
-        src: files/make_setuid_root
+        src: make_setuid_root
         dest: /usr/local/sbin/make_setuid_root
         owner: root
         group: root
@@ -43,7 +46,7 @@
 
     - name: Install scoped sudoers drop-in
       copy:
-        src: files/sudoers-seed-lab
+        src: sudoers-seed-lab
         dest: /etc/sudoers.d/90-seed-lab
         owner: root
         group: root
@@ -53,7 +56,7 @@
     # ── 4. Create Labsetup directory and deploy lab files ─────────────────────
     - name: Create Labsetup directory
       file:
-        path: /home/seed/Labsetup
+        path: "{{ lab_root }}"
         state: directory
         owner: seed
         group: seed
@@ -61,24 +64,24 @@
 
     - name: Deploy cow_attack.c
       copy:
-        src: roles/seed/files/Labsetup/cow_attack.c
-        dest: /home/seed/Labsetup/cow_attack.c
+        src: Labsetup/cow_attack.c
+        dest: "{{ lab_root }}/cow_attack.c"
         owner: seed
         group: seed
         mode: '0644'
 
     - name: Deploy cow_attack_passwd.c
       copy:
-        src: roles/seed/files/Labsetup/cow_attack_passwd.c
-        dest: /home/seed/Labsetup/cow_attack_passwd.c
+        src: Labsetup/cow_attack_passwd.c
+        dest: "{{ lab_root }}/cow_attack_passwd.c"
         owner: seed
         group: seed
         mode: '0644'
 
     - name: Deploy Makefile
       copy:
-        src: roles/seed/files/Labsetup/Makefile
-        dest: /home/seed/Labsetup/Makefile
+        src: Labsetup/Makefile
+        dest: "{{ lab_root }}/Makefile"
         owner: seed
         group: seed
         mode: '0644'
@@ -115,7 +118,7 @@
     # ── 8. Deploy flag files via APG-injected templates ───────────────────────
     - name: Deploy flag_task1 to /root/protected_dirtycow1.txt
       template:
-        src: templates/protected_dirtycow1.txt.j2
+        src: protected_dirtycow1.txt.j2
         dest: /root/protected_dirtycow1.txt
         owner: root
         group: root
@@ -123,7 +126,7 @@
 
     - name: Deploy flag_task2 to /root/protected_dirtycow2.txt
       template:
-        src: templates/protected_dirtycow2.txt.j2
+        src: protected_dirtycow2.txt.j2
         dest: /root/protected_dirtycow2.txt
         owner: root
         group: root
@@ -132,7 +135,7 @@
     # ── 9. Build and install flag_check setuid binary ─────────────────────────
     - name: Copy flag_check.c to /tmp
       copy:
-        src: files/flag_check.c
+        src: flag_check.c
         dest: /tmp/flag_check.c
         owner: root
         group: root

@@ -16,12 +16,12 @@ The topology is designed for **CyberRangeCZ / OpenStack** using standard flavors
 
 | Host | Image | Mgmt User | Flavor | IP Address | Purpose |
 |------|-------|-----------|--------|------------|---------|
-| `seed` | `seed` / `seed-ubuntu1204` | `ubuntu` | `m1.medium` | `10.1.30.10` | Student workstation with exploit source files, `/zzz`, and target user `charlie` |
-| `server` | `debian-12-x86_64` | `debian` | `standard.small` | `10.1.30.5` | Scoring server & flag verification API (`cow_flag/task1`, `cow_flag/task2`) |
-| `router` | `debian-12-x86_64` | `debian` | `standard.small` | `10.1.30.1` | Sandbox router and default gateway |
+| `seed` | `seed` / `seed-ubuntu1204` | `ubuntu` | `m1.medium` | `10.1.26.10` | Student workstation with exploit source files, `/zzz`, and target user `charlie` |
+| `server` | `debian-12-x86_64` | `debian` | `standard.small` | `10.1.26.5` | Scoring server & flag verification API (`cow_flag/task1`, `cow_flag/task2`) |
+| `router` | `debian-12-x86_64` | `debian` | `standard.small` | `10.1.26.1` | Sandbox router and default gateway |
 
 ### Pre-configured Accounts:
-- Default student user: `user` / `Password123`
+- Default student user: `seed` / `dees`
 - Unprivileged victim user: `charlie` / `seedcharlie` (UID `1001`)
 - Superuser: `root` (UID `0`)
 

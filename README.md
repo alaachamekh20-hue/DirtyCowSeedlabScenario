@@ -11,8 +11,8 @@ It is modeled after the official [`library-junior-hacker`](https://github.com/cy
 - **Topology File**: [`topology.yml`](topology.yml)
 - **Workstation Flavor**: `m1.medium`
 - **Workstation Image**: `seed` (or `seed-ubuntu1204` / vulnerable Linux kernel < 4.8.3)
-- **Scoring Server Image**: `debian-12-x86_64` (flavor `standard.small`, IP `10.1.30.5`)
-- **Router Image**: `debian-12-x86_64` (flavor `standard.small`, IP `10.1.30.1`)
+- **Scoring Server Image**: `debian-12-x86_64` (flavor `standard.small`, IP `10.1.26.5`)
+- **Router Image**: `debian-12-x86_64` (flavor `standard.small`, IP `10.1.26.1`)
 
 ---
 
@@ -34,7 +34,7 @@ The scenario is scored out of **20 points**, with hint penalties ranging from **
 To prevent students from sharing flags:
 - Utilizes the CyberRangeCZ **Automatic Problem Generation (APG)** feature via [`variables.yml`](variables.yml) with `variant_sandboxes: true`.
 - Each student sandbox generates unique alphanumeric tokens for `flag_task1` and `flag_task2`.
-- Flag verification is served dynamically by the internal sandbox service (`flag_server.py` on `10.1.30.5:8080`), ensuring students perform the actual exploitation steps to retrieve their unique flags.
+- Flag verification is served dynamically by the internal sandbox service (`flag_server.py` on `10.1.26.5:8080`), ensuring students perform the actual exploitation steps to retrieve their unique flags.
 
 ---
 
