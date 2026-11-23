@@ -95,15 +95,16 @@
         group: root
         mode: '0644'
 
-    # ── 6. Create user charlie ────────────────────────────────────────────────
+    # ── 6. Ensure user charlie exists (dynamic UID) ───────────────────────────
     - name: Create charlie user
       user:
         name: charlie
-        uid: 1001
         comment: "Charlie Brown,,,"
         shell: /bin/bash
         create_home: yes
-        password: "{{ 'seedcharlie' | password_hash('sha512') }}"
+
+    - name: Set charlie password
+      shell: echo 'charlie:seedcharlie' | chpasswd
 
     # ── 7. Backup /etc/passwd ──────────────────────────────────────────────────
     - name: Backup /etc/passwd

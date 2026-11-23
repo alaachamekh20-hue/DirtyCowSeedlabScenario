@@ -1,4 +1,4 @@
-# Dirty COW Attack Lab (SEED Lab on CyberRangeCZ) - Game Design Document
+﻿# Dirty COW Attack Lab (SEED Lab on CyberRangeCZ) - Game Design Document
 
 ## 1. Overview
 - **Scenario Name**: `dirtycow-seedlab`
@@ -22,7 +22,7 @@ The topology is designed for **CyberRangeCZ / OpenStack** using standard flavors
 
 ### Pre-configured Accounts:
 - Default student user: `seed` / `dees`
-- Unprivileged victim user: `charlie` / `seedcharlie` (UID `1001`)
+- Unprivileged victim user: `charlie` / `seedcharlie` (non-root UID)
 - Superuser: `root` (UID `0`)
 
 ---
@@ -61,6 +61,6 @@ To support 30+ students simultaneously without sharing answers, the lab utilizes
 
 4. **Root Privilege Escalation**:
    - The student adapts the exploit to target `/etc/passwd`.
-   - Modifies `charlie:x:1001` to `charlie:x:0000`.
+   - Modifies `charlie:x:` to `charlie:x:0000`.
    - Switches to user `charlie` (`su charlie`), resulting in immediate root permissions (`uid=0(root)`).
    - Retrieves the final flag from the verification server.
