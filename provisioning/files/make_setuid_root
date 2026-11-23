@@ -9,13 +9,13 @@
 #
 # Restrictions enforced:
 #   - Binary must already exist and be a regular file.
-#   - Binary must be under /home/user/Labsetup/ (student workspace only).
+#   - Binary must be under /home/seed/Labsetup/ (student workspace only).
 #   - Owner argument is accepted but always forced to root for safety.
 
 set -e
 
 BINARY="$2"
-ALLOWED_PREFIX="/home/user/Labsetup"
+ALLOWED_PREFIX="/home/seed/Labsetup"
 
 if [ -z "$BINARY" ]; then
     echo "Usage: sudo make_setuid_root <owner> <binary_path>" >&2

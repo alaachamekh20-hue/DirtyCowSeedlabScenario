@@ -21,11 +21,11 @@
         state: present
         update_cache: yes
 
-    # ── 2. Strip blanket sudo from user/seed account ───────────────────────────
-    - name: Disable broad sudoers entries for user
+    # ── 2. Strip blanket sudo from seed account ────────────────────────────────
+    - name: Disable broad sudoers entries for seed
       shell: |
         for f in /etc/sudoers.d/*; do
-          if grep -qE '^\s*(user|seed)\s+ALL\s*=\s*\(ALL\)' "$f" 2>/dev/null; then
+          if grep -qE '^\s*(seed)\s+ALL\s*=\s*\(ALL\)' "$f" 2>/dev/null; then
             mv "$f" "${f}.disabled"
           fi
         done
@@ -53,34 +53,34 @@
     # ── 4. Create Labsetup directory and deploy lab files ─────────────────────
     - name: Create Labsetup directory
       file:
-        path: /home/user/Labsetup
+        path: /home/seed/Labsetup
         state: directory
-        owner: user
-        group: user
+        owner: seed
+        group: seed
         mode: '0755'
 
     - name: Deploy cow_attack.c
       copy:
         src: roles/seed/files/Labsetup/cow_attack.c
-        dest: /home/user/Labsetup/cow_attack.c
-        owner: user
-        group: user
+        dest: /home/seed/Labsetup/cow_attack.c
+        owner: seed
+        group: seed
         mode: '0644'
 
     - name: Deploy cow_attack_passwd.c
       copy:
         src: roles/seed/files/Labsetup/cow_attack_passwd.c
-        dest: /home/user/Labsetup/cow_attack_passwd.c
-        owner: user
-        group: user
+        dest: /home/seed/Labsetup/cow_attack_passwd.c
+        owner: seed
+        group: seed
         mode: '0644'
 
     - name: Deploy Makefile
       copy:
         src: roles/seed/files/Labsetup/Makefile
-        dest: /home/user/Labsetup/Makefile
-        owner: user
-        group: user
+        dest: /home/seed/Labsetup/Makefile
+        owner: seed
+        group: seed
         mode: '0644'
 
     # ── 5. Create target file /zzz ────────────────────────────────────────────
@@ -150,16 +150,16 @@
         group: root
         mode: '4755'
 
-    # ── 10. Helpful bashrc aliases for user ───────────────────────────────────
-    - name: Add lab aliases to user bashrc
+    # ── 10. Helpful bashrc aliases for seed ───────────────────────────────────
+    - name: Add lab aliases to seed bashrc
       blockinfile:
-        path: /home/user/.bashrc
+        path: /home/seed/.bashrc
         marker: "# {mark} DIRTY COW LAB ALIASES"
         block: |
           alias checklab='flag_check'
           alias resetzzz='echo "111111222222333333" | sudo tee /zzz > /dev/null && echo "/zzz reset."'
           alias resetpasswd='sudo cp /etc/passwd.seedbak /etc/passwd && echo "/etc/passwd restored."'
         create: yes
-        owner: user
-        group: user
+        owner: seed
+        group: seed
         mode: '0644'

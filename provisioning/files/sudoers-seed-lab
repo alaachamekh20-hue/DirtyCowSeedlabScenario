@@ -1,4 +1,4 @@
-# Grant the "user" account passwordless sudo ONLY on the scoped helper.
+# Grant the "seed" account passwordless sudo ONLY on the scoped helper.
 # This allows students to set the setuid-root bit on their compiled exploits
 # without giving them unrestricted root access via "sudo su" or "sudo cat".
-user ALL=(root) NOPASSWD: /usr/local/sbin/make_setuid_root
+seed ALL=(root) NOPASSWD: /usr/local/sbin/make_setuid_root
