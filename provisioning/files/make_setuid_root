@@ -1,0 +1,42 @@
+#!/bin/sh
+# make_setuid_root - scoped privilege-escalation helper for the Dirty COW lab
+#
+# Usage (via sudoers): sudo /usr/local/sbin/make_setuid_root <owner> <binary_path>
+#
+# Sets the owner to root and enables the setuid bit on ONE specific compiled
+# binary so that students can test Set-UID behaviour without having blanket
+# sudo access that would let them bypass lab challenges.
+#
+# Restrictions enforced:
+#   - Binary must already exist and be a regular file.
+#   - Binary must be under /home/user/Labsetup/ (student workspace only).
+#   - Owner argument is accepted but always forced to root for safety.
+
+set -e
+
+BINARY="$2"
+ALLOWED_PREFIX="/home/user/Labsetup"
+
+if [ -z "$BINARY" ]; then
+    echo "Usage: sudo make_setuid_root <owner> <binary_path>" >&2
+    exit 1
+fi
+
+# Resolve to absolute path and reject path traversal
+BINARY="$(realpath "$BINARY" 2>/dev/null)" || { echo "Cannot resolve path: $2" >&2; exit 1; }
+
+# Restrict to student workspace
+case "$BINARY" in
+    "$ALLOWED_PREFIX"/*)  ;;
+    *) echo "Error: binary must be under $ALLOWED_PREFIX" >&2; exit 1 ;;
+esac
+
+# Must be a regular file
+if [ ! -f "$BINARY" ]; then
+    echo "Error: $BINARY is not a regular file." >&2
+    exit 1
+fi
+
+chown root:root "$BINARY"
+chmod u+s "$BINARY"
+echo "Done: $BINARY is now owned by root with the setuid bit set."

@@ -1,12 +1,7 @@
----
-# CyberRangeCZ Automatic Problem Generation (APG) Variables
-# When variant_sandboxes: true is set in training.json, these generate unique flags per student sandbox
-
-
 flag_task1:
-    type: password
-    length: 16
+  type: password
+  length: 16
 
 flag_task2:
-    type: password
-    length: 16
+  type: password
+  length: 16

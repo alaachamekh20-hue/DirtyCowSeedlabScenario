@@ -1,45 +1,165 @@
 ---
-# Dirty COW SeedLab - Ansible Provisioning Playbook
+# Dirty COW SeedLab - Standalone Ansible Provisioning Playbook
+# No external roles, no requirements.yml, no network downloads from GitHub.
+# All files come from this repository.
 
-# Step 1: Install common tools on all hosts
-- name: Configure all hosts
-  hosts: hosts
-  become: yes
-  roles:
-    - hosts
-
-# Step 2: Configure the seed (student) machine
 - name: Configure seed machine
   hosts: seed
   become: true
-  roles:
-    - role: user-access
-      user_access_username: user
-      user_access_password: Password123
-      user_access_sudo: True
-    - role: seed
-    - role: chrony
 
-# Step 3: Configure the verification / scoring server
-- name: Configure server
-  hosts: server
-  become: true
-  roles:
-    - role: server
+  tasks:
 
-# Step 4: Setup logging for all hosts and routers
-- name: Setup sandbox logging
-  hosts:
-    - routers
-    - hosts
-  become: yes
-  vars:
-    sandbox_name: dirtycow-seedlab
-    central_syslog_ip: 78.128.251.179
-  roles:
-    - role: sandbox-logging
-      slf_destination_port: '{% if hostvars["man"] is defined -%} 514 {%- else -%} 515 {%- endif %}'
-      slf_destination: '{% if hostvars["man"] is defined -%} {{ hostvars["man"].ansible_host }} {%- else -%} {{ central_syslog_ip }} {%- endif %}'
-      slf_sandbox_id: "{{ global_sandbox_id | default(student_id) | default(0) }}"
-      slf_sandbox_name: '{{ global_sandbox_name | default(sandbox_name) }}'
-      slf_pool_id: '{{ global_pool_id | default(None) }}'
+    # ── 1. Base packages ───────────────────────────────────────────────────────
+    - name: Install required packages
+      apt:
+        name:
+          - build-essential
+          - gcc
+          - make
+          - vim
+          - net-tools
+        state: present
+        update_cache: yes
+
+    # ── 2. Strip blanket sudo from user/seed account ───────────────────────────
+    - name: Disable broad sudoers entries for user
+      shell: |
+        for f in /etc/sudoers.d/*; do
+          if grep -qE '^\s*(user|seed)\s+ALL\s*=\s*\(ALL\)' "$f" 2>/dev/null; then
+            mv "$f" "${f}.disabled"
+          fi
+        done
+      args:
+        executable: /bin/bash
+
+    # ── 3. Scoped sudo helper: only allow make_setuid_root ────────────────────
+    - name: Install make_setuid_root helper
+      copy:
+        src: files/make_setuid_root
+        dest: /usr/local/sbin/make_setuid_root
+        owner: root
+        group: root
+        mode: '0750'
+
+    - name: Install scoped sudoers drop-in
+      copy:
+        src: files/sudoers-seed-lab
+        dest: /etc/sudoers.d/90-seed-lab
+        owner: root
+        group: root
+        mode: '0440'
+        validate: 'visudo -cf %s'
+
+    # ── 4. Create Labsetup directory and deploy lab files ─────────────────────
+    - name: Create Labsetup directory
+      file:
+        path: /home/user/Labsetup
+        state: directory
+        owner: user
+        group: user
+        mode: '0755'
+
+    - name: Deploy cow_attack.c
+      copy:
+        src: roles/seed/files/Labsetup/cow_attack.c
+        dest: /home/user/Labsetup/cow_attack.c
+        owner: user
+        group: user
+        mode: '0644'
+
+    - name: Deploy cow_attack_passwd.c
+      copy:
+        src: roles/seed/files/Labsetup/cow_attack_passwd.c
+        dest: /home/user/Labsetup/cow_attack_passwd.c
+        owner: user
+        group: user
+        mode: '0644'
+
+    - name: Deploy Makefile
+      copy:
+        src: roles/seed/files/Labsetup/Makefile
+        dest: /home/user/Labsetup/Makefile
+        owner: user
+        group: user
+        mode: '0644'
+
+    # ── 5. Create target file /zzz ────────────────────────────────────────────
+    - name: Create /zzz with initial content
+      copy:
+        content: "111111222222333333\n"
+        dest: /zzz
+        owner: root
+        group: root
+        mode: '0644'
+
+    # ── 6. Create user charlie ────────────────────────────────────────────────
+    - name: Create charlie user
+      user:
+        name: charlie
+        uid: 1001
+        comment: "Charlie Brown,,,"
+        shell: /bin/bash
+        create_home: yes
+        password: "{{ 'seedcharlie' | password_hash('sha512') }}"
+
+    # ── 7. Backup /etc/passwd ──────────────────────────────────────────────────
+    - name: Backup /etc/passwd
+      copy:
+        src: /etc/passwd
+        dest: /etc/passwd.seedbak
+        remote_src: yes
+        owner: root
+        group: root
+        mode: '0644'
+
+    # ── 8. Deploy flag files via APG-injected templates ───────────────────────
+    - name: Deploy flag_task1 to /root/protected_dirtycow1.txt
+      template:
+        src: templates/protected_dirtycow1.txt.j2
+        dest: /root/protected_dirtycow1.txt
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Deploy flag_task2 to /root/protected_dirtycow2.txt
+      template:
+        src: templates/protected_dirtycow2.txt.j2
+        dest: /root/protected_dirtycow2.txt
+        owner: root
+        group: root
+        mode: '0600'
+
+    # ── 9. Build and install flag_check setuid binary ─────────────────────────
+    - name: Copy flag_check.c to /tmp
+      copy:
+        src: files/flag_check.c
+        dest: /tmp/flag_check.c
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Compile flag_check
+      command: gcc -o /usr/local/bin/flag_check /tmp/flag_check.c
+      args:
+        creates: /usr/local/bin/flag_check
+
+    - name: Set flag_check owner root and setuid bit
+      file:
+        path: /usr/local/bin/flag_check
+        owner: root
+        group: root
+        mode: '4755'
+
+    # ── 10. Helpful bashrc aliases for user ───────────────────────────────────
+    - name: Add lab aliases to user bashrc
+      blockinfile:
+        path: /home/user/.bashrc
+        marker: "# {mark} DIRTY COW LAB ALIASES"
+        block: |
+          alias checklab='flag_check'
+          alias resetzzz='echo "111111222222333333" | sudo tee /zzz > /dev/null && echo "/zzz reset."'
+          alias resetpasswd='sudo cp /etc/passwd.seedbak /etc/passwd && echo "/etc/passwd restored."'
+        create: yes
+        owner: user
+        group: user
+        mode: '0644'
